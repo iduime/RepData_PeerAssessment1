@@ -1,0 +1,225 @@
+---
+title: 'Week 2 Assignment : Course Project 1'
+author: "Ike"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    keep_md: true
+header-includes: 
+  - \usepackage{color}
+  - \usepackage{framed}
+fig_Caption: true
+
+---
+----------------------------------------
+
+```{r global, include=TRUE, warning=FALSE, message=FALSE, highlight=TRUE, fig.dim=c(6,5), fig.align='center'}
+# 
+knitr::opts_chunk$set(echo = TRUE, comment = NA)
+library(DT)
+library(xtable)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+#convert date to a Date variable
+mydata <- data.frame(read.csv("activity.csv", stringsAsFactors = FALSE))
+mydata$date <- as.Date(mydata$date)
+
+```
+---------------------------------------
+
+
+## Introduction
+
+This assignment used data collected each day, at five minute intervals over a 2 month period 
+with a personal activity monitoring device. 
+
+---------------------------------------
+  
+## Part 1
+
+#### The mean, sum and, median number of steps taken per day
+
+Here, missing values in the **steps** column were excluded. The rest of the data was grouped by date
+and the daily mean, total number of steps and, median values for each day were returned 
+These values are shown below as column values of summarized data for each day. The total number of
+observations are **`r nrow(mydata) `**
+
+
+------------------------------------------
+ 
+```{r showtable, results='asis', warning=FALSE, message=FALSE}
+
+# Remove all observations with missing values
+mydata <- na.omit(mydata)
+#
+    DataSummary <- mydata %>% 
+	      group_by(date) %>% 
+	      summarize( MeanSteps = round(mean(steps), 2), 
+			            SumSteps = sum(steps), 
+			            MedianSteps = median(steps))
+knitr::kable(head(DataSummary, 10), caption = ("The mean, total number of steps and median steps per day"))
+
+
+```
+--------------------------------------------
+
+#### Histogram of total number of steps taken each day
+
+
+```{r, warning=FALSE, message=FALSE}
+
+gplot1 <- ggplot(data=DataSummary, aes(SumSteps)) + 
+    geom_histogram(alpha = .5, col="blue", 
+                 aes(fill=..count..)) + 
+      labs(title="Histogram of Total Number of Steps Per Day",
+       x = "Total number of steps taken each day")
+return(ggplotly(gplot1))
+
+
+```
+
+#### Average Daily Activity Pattern  
+
+
+Below, is a time series plot of daily activities with a vertical line was drawn at five minute interval
+with maximum number of steps.
+
+
+```{r}
+#
+maxint <- max(mydata$steps)
+gplot2 <- ggplot(data=mydata, aes(x=interval, y=steps)) + 
+  		    geom_point() +
+		      geom_vline(xintercept = maxint, linetype="dotted", 
+                color = "red", size=1.5) +
+          labs(title="Time series plot of steps vs intervals",
+          x = "Intervals")
+return(ggplotly(gplot2))
+
+```
+
+#### The five minute interval with maximum number of steps across the data set is `r maxint `
+
+------------------------------------------------
+
+## Part 2
+
+
+#### Activity data with missing values imputed
+
+
+```{r}
+
+#Load data again and count the number of observations with missing values
+
+mydataM <- data.frame(read.csv("activity.csv", stringsAsFactors = FALSE))
+mydataM$date <- as.Date(mydataM$date)
+missingData <- sum(is.na(mydataM))
+
+
+```
+--------------------------------------------
+
+#### The number of observations with missing values is  `r missingData ` 
+
+The mising values are only in the **steps** taken column. We will replace each missing value with the mean
+value of that column and verify that new dataset has zero missing values afterwards.
+
+```{r}
+
+mydataM$steps[is.na(mydataM$steps)] <- mean(mydataM$steps, na.rm=TRUE)
+missingDataM <- sum(is.na(mydataM))
+
+
+```
+
+#### After imputing mising values, the number of observations with missing values is  `r missingDataM ` 
+The total number of observations with missing values replaced is **`r nrow(mydataM) `**
+
+
+----------------------------------------------
+
+#### The mean, sum and, median number of steps each day with missing values imputed
+
+
+
+```{r, warning=FALSE, message=FALSE}
+    DataSum <- mydataM %>% 
+	      group_by(date) %>% 
+	      summarize(M_Steps = round(mean(steps), 2), 
+			            S_Steps = round(sum(steps), 2),
+			            MedSteps = round(median(steps), 2))
+knitr::kable(head(DataSum, 10), caption = ("The Mean, Total and Median steps per day"))
+#
+gplot3 <- ggplot(data=DataSum, aes(M_Steps)) + 
+  geom_histogram(alpha = .5, col="blue", 
+                 aes(fill=..count..)) + 
+    labs(title="Histogram of the total steps without missing values imputed",
+       x = "Total number of steps taken each day")
+
+return(ggplotly(gplot3))
+
+
+```
+
+The results show that replacing all 2304 missing values with mean values has the effect of increasing
+overall values (overall mean, total number of steps and, median) compared to previous values with missing 
+observation removed.
+
+------------------------------
+
+## Part 3
+
+
+
+#### Possible differences in activity pattern during weekdays and weekends
+
+```{r}
+   mydataM$date <- as.Date(mydataM$date)
+#create a factor variable 'WDays' of weekdays and weekends
+WeekDays <- c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday')
+mydataM$WDays <- factor((weekdays(mydataM$date) %in% WeekDays), 
+         levels=c(FALSE, TRUE), labels=c('Weekend', 'Weekday') )
+#
+table(mydataM$WDays)
+
+```
+
+
+---------------------------------------------
+
+#### A time series of data for weekdays and weekends 
+
+```{r}
+
+    ggplot(data = mydataM) +
+	     geom_point( mapping = aes(x=interval, y = steps) ) +
+	              facet_wrap(~WDays) 
+
+
+```
+
+---------------------------------------------
+
+#### Filter data for weekdays and weekends
+
+```{r}
+WeekEnd  <- mydataM %>% 
+	 filter(WDays == 'Weekend') 
+#
+     ggplot(data = WeekEnd) +
+         geom_line( mapping = aes(x=interval, y = steps) ) +
+       labs(title="WeekEnd")
+
+WeekDay  <- mydataM %>% 
+		group_by(date, interval, WDays) %>%
+        filter(WDays == 'Weekday')  
+#
+ ggplot(data = WeekDay) +
+    geom_line( mapping = aes(x=interval, y = steps) ) +
+   labs(title="WeekDay")
+
+```
+
+
